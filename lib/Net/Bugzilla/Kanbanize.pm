@@ -290,8 +290,8 @@ sub get_bugs_from_all_cards {
         }
         $all_cards->{ $card->{taskid} } = $card;
 
-        my $extlink = $card->{extlink};    # XXX: Smarter parsing
-        if ( $extlink =~ /(\d+)$/ ) {
+        my $extlink = $card->{extlink};
+        if ( $extlink =~ m{^$BUGZILLA_URL/show_bug\.cgi\?id=(\d+)$} ) {
             my $bugid = $1;
             push @bugs, $bugid;
         }
