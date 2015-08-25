@@ -139,21 +139,21 @@ sub get_bugs {
 
     foreach my $bug ( @{ $data->{bugs} } ) {
         $bugs{ $bug->{id} } = $bug;
-	$bugs{ $bug->{id} }{source} = "search";
+        $bugs{ $bug->{id} }{source} = "search";
     }
 
     my @marked = get_marked_bugs();
 
     foreach my $bug (@marked) {
         $bugs{ $bug->{id} } = $bug;
-	$bugs{ $bug->{id} }{source} = "marked";
+        $bugs{ $bug->{id} }{source} = "marked";
     }
     
     my @cced = get_cced_bugs();
 
     foreach my $bug (@cced) {
         $bugs{ $bug->{id} } = $bug;
-	$bugs{ $bug->{id} }{source} = "cc";
+        $bugs{ $bug->{id} }{source} = "cc";
     }
 
     my @cards = get_bugs_from_all_cards();
@@ -197,7 +197,7 @@ sub fill_missing_bugs_info {
 
     foreach my $bug ( sort @found_bugs ) {
         $bugs->{ $bug->{id} } = $bug;
-	$bugs->{ $bug->{id} }{source} = $;
+        $bugs->{ $bug->{id} }{source} = $;
     }
 
     return;
@@ -275,8 +275,8 @@ sub get_bugs_from_all_cards {
     foreach my $card (@$cards) {
         # Skip archived cards
         if ($card->{columnname} eq 'Archive') {
-	  next;
-	}
+          next;
+        }
         $all_cards->{ $card->{taskid} } = $card;
 
         my $extlink = $card->{extlink};    # XXX: Smarter parsing
@@ -314,10 +314,10 @@ sub sync_bug {
     my @changes;
     if ( not defined $card ) {
         if ($bug->{source} eq 'card') {
-	  # This is a bug that came from a card but without a matching whiteboard...
-	  $log->warn("Bug $bug->{id} came from a card, but whiteboard is empty");
-	  return;
-	}
+          # This is a bug that came from a card but without a matching whiteboard...
+          $log->warn("Bug $bug->{id} came from a card, but whiteboard is empty");
+          return;
+        }
 
         $card = create_card($bug);
 
@@ -383,9 +383,9 @@ sub retrieve_card {
         if ( $data->{Error} eq 'No such task or board.' ) {
             return;
         }
-	#XXX: Might need to clear the whiteboard or sth...
-	$log->warn("Can't find card $card_id for bug $bug_id");
-	return;
+        #XXX: Might need to clear the whiteboard or sth...
+        $log->warn("Can't find card $card_id for bug $bug_id");
+        return;
         #die Dumper( $data, $res );    #$res->status_line;
     }
 
@@ -417,16 +417,16 @@ sub sync_card {
 
     if (   defined $card_assigned
         && $card_assigned ne "None"
-	&& $card_assigned ne 'nobody'
+        && $card_assigned ne 'nobody'
         && !assigned_bugzilla_email($bug_assigned)
-	 )
+         )
     {
         my $error = update_bug_assigned( $bug, $card_assigned );
-	
-	if (!$error) {
-	  $error = "**FAILED**";
-	}
-	
+        
+        if (!$error) {
+          $error = "**FAILED**";
+        }
+        
         push @updated, "Update bug $bug->{id} assigned to $card_assigned $error";
     }
     elsif ( ($bug_assigned ne $card_assigned_bugmail)
@@ -434,17 +434,17 @@ sub sync_card {
     {
         
         my $kanbanid = bugmail_to_kanbanid($bug_assigned);
-	my $bugmail = kanbanid_to_bugmail($kanbanid);
+        my $bugmail = kanbanid_to_bugmail($kanbanid);
 
-	if ($bug_assigned ne $bugmail) {
-	  $log->warn("[bug $bug->{id}] Bugmail user $bug_assigned not mapped to a kanban user, skipping assigned checks");
-	}
-	else {
+        if ($bug_assigned ne $bugmail) {
+          $log->warn("[bug $bug->{id}] Bugmail user $bug_assigned not mapped to a kanban user, skipping assigned checks");
+        }
+        else {
           push @updated, "Update card assigned to $kanbanid";
           #print STDERR
           # "bug_asigned: $bug_assigned card_assigned: $card_assigned\n";
           update_card_assigned( $card, $bug_assigned );
-	}
+        }
     }
 
     #Check summary (XXX: Formatting assumption here)
@@ -481,7 +481,7 @@ sub sync_card {
             #$updated++;
         }
         else {
-	    # If it's in webops, close it, otherwise, skip it ?
+            # If it's in webops, close it, otherwise, skip it ?
             $log->warn("Bug $bug->{id} is not RESOLVED ($bug_status) but card $card->{taskid} says $card_status");
         }
     }
@@ -532,12 +532,12 @@ sub complete_card {
 
     if ( !$res->is_success ) {
         my $content = $res->content;
-	my $status  = $res->status_line;
-	if ($content) {
-	  
-	} else {
+        my $status  = $res->status_line;
+        if ($content) {
+          
+        } else {
           $log->warn(Dumper($res));    #$res->status_line;
-	}
+        }
     }
 }
 
@@ -593,23 +593,23 @@ sub update_bug_assigned {
 
     if ( !$res->is_success ) {
         my $ct = $res->content_type;
-	
-	if ($ct eq 'application/json') {
-	  my $error;
-	  
-	  eval {
-	    $error = decode_json($res->content);
-	  };
-	  
-	  if (ref($error) eq 'HASH') {
-	    my $code = $error->{code};
-	    my $error_message = $error->{message};
-	    $log->error("Error no=$code talking to bugzilla: $error_message");
-	    return;
-	  }
-	}
-	
-	
+        
+        if ($ct eq 'application/json') {
+          my $error;
+          
+          eval {
+            $error = decode_json($res->content);
+          };
+          
+          if (ref($error) eq 'HASH') {
+            my $code = $error->{code};
+            my $error_message = $error->{message};
+            $log->error("Error no=$code talking to bugzilla: $error_message");
+            return;
+          }
+        }
+        
+        
         die Dumper($res);    #$res->status_line;
     }
     
@@ -696,13 +696,13 @@ sub update_whiteboard {
     
     # Clear unqualified whiteboard
     if ( $whiteboard =~ m{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]} ) {
-	$whiteboard =~ s{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]}{};
+        $whiteboard =~ s{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]}{};
     }
     
     # Clear old qualified whiteboards
     
     if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+} ) {
-    	$whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+}{};
+            $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+}{};
     }
     
     
@@ -841,11 +841,11 @@ sub parse_whiteboard {
     {
         my $boardid = $1;
         my $cardid  = $2;
-	
-	if ($BOARD_ID ne $boardid) {
-	  $log->warn( "Found a card from a mismatched board:$boardid" );
-	  return undef;
-	}
+        
+        if ($BOARD_ID ne $boardid) {
+          $log->warn( "Found a card from a mismatched board:$boardid" );
+          return undef;
+        }
 
         $card = { taskid => $cardid };
     }
@@ -855,10 +855,10 @@ sub parse_whiteboard {
         my $boardid = $1;
         my $cardid  = $2;
 
-	if ($BOARD_ID ne $boardid) {
-	  $log->warn( "Found a card from a mismatched board:$boardid" );
-	  return undef;
-	}
+        if ($BOARD_ID ne $boardid) {
+          $log->warn( "Found a card from a mismatched board:$boardid" );
+          return undef;
+        }
 
         $card = { taskid => $cardid };
     }
@@ -866,7 +866,7 @@ sub parse_whiteboard {
       $log->info( "Should ignore this card!" );
       $card = {
         ignore => 1,
-	taskid => 0 
+        taskid => 0 
       };
     }
 
