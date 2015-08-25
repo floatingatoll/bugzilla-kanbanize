@@ -52,6 +52,7 @@ my $BOARD_ID;
 my $BUGZILLA_TOKEN;
 my $KANBANIZE_INCOMING;
 my $WHITEBOARD_TAG;
+my $BUGZILLA_URL;
 my @COMPONENTS;
 my @PRODUCTS;
 my %BUGMAIL_TO_KANBANID;
@@ -80,6 +81,11 @@ sub run {
     $KANBANIZE_INCOMING = $config->kanbanize_incoming;
 
     $WHITEBOARD_TAG = $config->tag || die "Missing whiteboard tag";
+
+    $BUGZILLA_URL = $config->bugzilla_url || die "Missing bugzilla url";
+    if ($BUGZILLA_URL !~ m{^https://}) {
+        die "Bugzilla url must start with https://";
+    }
 
     @COMPONENTS = @{$config->component};
     @PRODUCTS = @{$config->product};
@@ -117,7 +123,7 @@ use URI;
 use URI::QueryParam;
 
 sub get_bugs {
-    my $uri = URI->new("https://bugzilla.mozilla.org/rest/bug");
+    my $uri = URI->new("${BUGZILLA_URL}/rest/bug");
 
     $uri->query_param(token => $BUGZILLA_TOKEN);
     $uri->query_param(include_fields => qw(id status whiteboard summary assigned_to));
@@ -180,7 +186,7 @@ sub fill_missing_bugs_info {
 
     my $missing_bugs_ids = join ",", sort @missing_bugs;
 
-    my $url = "https://bugzilla.mozilla.org/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&id=$missing_bugs_ids";
+    my $url = "${BUGZILLA_URL}/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&id=$missing_bugs_ids";
 
     my $req =
       HTTP::Request->new( GET => $url );
@@ -209,7 +215,7 @@ sub get_cced_bugs {
 
     my $req =
       HTTP::Request->new( GET =>
-"https://bugzilla.mozilla.org/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&emailcc1=1&emailtype1=exact&email1=$email"
+"${BUGZILLA_URL}/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&emailcc1=1&emailtype1=exact&email1=$email"
       );
 
     my $res = $ua->request($req);
@@ -226,7 +232,7 @@ sub get_cced_bugs {
 }
 
 sub get_marked_bugs {
-    my $uri = URI->new("https://bugzilla.mozilla.org/rest/bug");
+    my $uri = URI->new("${BUGZILLA_URL}/rest/bug");
 
     $uri->query_param(token => $BUGZILLA_TOKEN);
     $uri->query_param(include_fields => qw(id status whiteboard summary assigned_to));
@@ -487,7 +493,7 @@ sub sync_card {
     }
 
     # Check extlink
-    my $bug_link = "https://bugzilla.mozilla.org/show_bug.cgi?id=$bug->{id}";
+    my $bug_link = "${BUGZILLA_URL}/show_bug.cgi?id=$bug->{id}";
 
     if ( $card->{extlink} ne $bug_link ) {
         update_card_extlink( $card, $bug_link );
@@ -585,7 +591,7 @@ sub update_bug_assigned {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     $req->content("assigned_to=$assigned&token=$BUGZILLA_TOKEN");
 
@@ -687,7 +693,7 @@ sub update_whiteboard {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     # Clear kanban request
     if ( $whiteboard =~ m/\[kanban:$WHITEBOARD_TAG\]/ ) {
@@ -730,7 +736,7 @@ sub clear_whiteboard {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     $whiteboard =~ s/\s?\[kanban:[^]]+\]\s?//g;
 
@@ -755,7 +761,7 @@ sub create_card {
 
     my $data = {
         'title'   => api_encode_title("$bug->{id} - $bug->{summary}"),
-        'extlink' => "https://bugzilla.mozilla.org/show_bug.cgi?id=$bug->{id}",
+        'extlink' => "${BUGZILLA_URL}/show_bug.cgi?id=$bug->{id}",
         'boardid' => $BOARD_ID,
     };
 
@@ -816,7 +822,7 @@ sub move_card {
 sub get_bug_info {
     my $bugid = shift;
     my $data =
-      get("https://bugzilla.mozilla.org/rest/bug/$bugid?token=$BUGZILLA_TOKEN");
+      get("${BUGZILLA_URL}/rest/bug/$bugid?token=$BUGZILLA_TOKEN");
 
     if ( not $data ) {
         $log->error( "Failed getting Bug info for Bug $bugid from bugzilla" );
