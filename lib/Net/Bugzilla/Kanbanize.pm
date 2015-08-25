@@ -284,17 +284,18 @@ sub get_bugs_from_all_cards {
 
     my @bugs;
     foreach my $card (@$cards) {
-        # Skip archived cards
-        if ($card->{columnname} eq 'Archive') {
-          next;
-        }
-        $all_cards->{ $card->{taskid} } = $card;
-
         my $extlink = $card->{extlink};
+        my $bugid = 0;
         if ( $extlink =~ m{^$BUGZILLA_URL/show_bug\.cgi\?id=(\d+)$} ) {
-            my $bugid = $1;
+            $bugid = $1;
             push @bugs, $bugid;
         }
+
+        # Skip archived cards
+        if ($card->{columnname} eq 'Archive') {
+          next unless $bugid;
+        }
+        $all_cards->{ $card->{taskid} } = $card;
     }
 
     return @bugs;
