@@ -66,9 +66,9 @@ my $config;
 
 sub run {
     my $self = shift;
-    
+
     $config = $self->{config};
-    
+
     $DRYRUN = $config->get('test');
 
     $APIKEY = ( $config->kanbanize_apikey || $ENV{KANBANIZE_APIKEY}) or die "Please configure an apikey";
@@ -76,14 +76,14 @@ sub run {
       or die "Please configure a kanbanize_boardid";
     $BUGZILLA_TOKEN = ( $config->bugzilla_token || $ENV{BUGZILLA_TOKEN})
       or die "Please configure a bugzilla_token";
-    
+
     $KANBANIZE_INCOMING = $config->kanbanize_incoming;
-    
+
     $WHITEBOARD_TAG = $config->tag || die "Missing whiteboard tag";
-    
+
     @COMPONENTS = @{$config->component};
     @PRODUCTS = @{$config->product};
-    
+
     %BUGMAIL_TO_KANBANID = %{$config->get("mail-map_bugmail")};
     %KANBANID_TO_BUGMAIL = reverse %BUGMAIL_TO_KANBANID;
 
@@ -148,7 +148,7 @@ sub get_bugs {
         $bugs{ $bug->{id} } = $bug;
         $bugs{ $bug->{id} }{source} = "marked";
     }
-    
+
     my @cced = get_cced_bugs();
 
     foreach my $bug (@cced) {
@@ -173,13 +173,13 @@ sub fill_missing_bugs_info {
             push @missing_bugs, $bugid;
         }
     }
-    
+
     if (not @missing_bugs) {
       return;
     }
 
     my $missing_bugs_ids = join ",", sort @missing_bugs;
-    
+
     my $url = "https://bugzilla.mozilla.org/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&id=$missing_bugs_ids";
 
     my $req =
@@ -310,7 +310,7 @@ sub sync_bug {
     my $whiteboard = $bug->{whiteboard};
 
     my $card = parse_whiteboard($whiteboard);
-    
+
     my @changes;
     if ( not defined $card ) {
         if ($bug->{source} eq 'card') {
@@ -340,7 +340,7 @@ sub sync_bug {
       clear_whiteboard( $bug->{id}, $card->{taskid}, $whiteboard );
       return;
     }
-    
+
     $card = $new_card;
 
     my $cardid = $card->{taskid};
@@ -372,8 +372,8 @@ sub retrieve_card {
       HTTP::Request->new( POST =>
 "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/get_task_details/boardid/$BOARD_ID/taskid/$card_id/format/json"
       );
-      
-    $req->header( "Content-Length" => "0" );  
+
+    $req->header( "Content-Length" => "0" );
 
     my $res = $ua->request($req);
 
@@ -406,9 +406,9 @@ sub sync_card {
     # Check Assignee
     my $bug_assigned  = $bug->{assigned_to};
     my $card_assigned = $card->{assignee};
-    
+
     # Need to convert assigned to canonical version, bugmail
-    
+
     my $card_assigned_bugmail = kanbanid_to_bugmail($card->{assignee});
 
     if ( not defined $card_assigned ) {
@@ -422,17 +422,17 @@ sub sync_card {
          )
     {
         my $error = update_bug_assigned( $bug, $card_assigned );
-        
+
         if (!$error) {
           $error = "**FAILED**";
         }
-        
+
         push @updated, "Update bug $bug->{id} assigned to $card_assigned $error";
     }
     elsif ( ($bug_assigned ne $card_assigned_bugmail)
         && assigned_bugzilla_email($bug_assigned) )
     {
-        
+
         my $kanbanid = bugmail_to_kanbanid($bug_assigned);
         my $bugmail = kanbanid_to_bugmail($kanbanid);
 
@@ -515,7 +515,7 @@ sub complete_card {
         taskid  => $taskid,
         column  => 'Done',
     };
-    
+
     if ($DRYRUN) {
       $log->debug("complete card");
       return;
@@ -534,7 +534,7 @@ sub complete_card {
         my $content = $res->content;
         my $status  = $res->status_line;
         if ($content) {
-          
+
         } else {
           $log->warn(Dumper($res));    #$res->status_line;
         }
@@ -573,11 +573,11 @@ sub update_card_extlink {
 
 sub update_bug_assigned {
     my ( $bug, $assigned ) = @_;
-    
+
     $assigned = kanbanid_to_bugmail($assigned);
 
     my $bugid = $bug->{id};
-    
+
     if ($DRYRUN) {
       $log->debug( "Updating bug assigned to $assigned" );
       return;
@@ -593,14 +593,14 @@ sub update_bug_assigned {
 
     if ( !$res->is_success ) {
         my $ct = $res->content_type;
-        
+
         if ($ct eq 'application/json') {
           my $error;
-          
+
           eval {
             $error = decode_json($res->content);
           };
-          
+
           if (ref($error) eq 'HASH') {
             my $code = $error->{code};
             my $error_message = $error->{message};
@@ -608,11 +608,11 @@ sub update_bug_assigned {
             return;
           }
         }
-        
-        
+
+
         die Dumper($res);    #$res->status_line;
     }
-    
+
     return $res->is_success;
 }
 
@@ -652,7 +652,7 @@ sub update_card_assigned {
     my ( $card, $bug_assigned ) = @_;
 
     my $taskid = $card->{taskid};
-    
+
     my $assignee = bugmail_to_kanbanid($bug_assigned);
 
     if ($DRYRUN) {
@@ -679,7 +679,7 @@ sub update_card_assigned {
 
 sub update_whiteboard {
     my ( $bugid, $cardid, $whiteboard ) = @_;
-    
+
     if ($DRYRUN) {
       $log->debug( "Updating whiteboard" );
       return;
@@ -693,19 +693,19 @@ sub update_whiteboard {
     if ( $whiteboard =~ m/\[kanban:$WHITEBOARD_TAG\]/ ) {
         $whiteboard =~ s/\[kanban:$WHITEBOARD_TAG\]//;
     }
-    
+
     # Clear unqualified whiteboard
     if ( $whiteboard =~ m{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]} ) {
         $whiteboard =~ s{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]}{};
     }
-    
+
     # Clear old qualified whiteboards
-    
+
     if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+} ) {
             $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+}{};
     }
-    
-    
+
+
 
     $whiteboard =
       "[kanban:https://$WHITEBOARD_TAG.kanbanize.com/ctrl_board/$BOARD_ID/$cardid] $whiteboard";
@@ -747,7 +747,7 @@ sub clear_whiteboard {
 #XXX: https://bugzil.la/970457
 sub create_card {
     my $bug = shift;
-    
+
     if ($DRYRUN) {
       $log->debug( "Creating card" );
       return { taskid => 0, id => 0, };
@@ -785,7 +785,7 @@ sub create_card {
 
 sub move_card {
     my ( $card, $lane ) = @_;
-    
+
     if ($DRYRUN) {
       $log->debug( "Moving card to $lane" );
       return;
@@ -841,7 +841,7 @@ sub parse_whiteboard {
     {
         my $boardid = $1;
         my $cardid  = $2;
-        
+
         if ($BOARD_ID ne $boardid) {
           $log->warn( "Found a card from a mismatched board:$boardid" );
           return undef;
@@ -866,7 +866,7 @@ sub parse_whiteboard {
       $log->info( "Should ignore this card!" );
       $card = {
         ignore => 1,
-        taskid => 0 
+        taskid => 0
       };
     }
 
@@ -875,31 +875,31 @@ sub parse_whiteboard {
 
 sub assigned_bugzilla_email {
   my $mail = shift;
-  
+
   my $assigned = 1;
-  
+
   if ($mail =~ m/\@.*\.bugs$/) {
     $assigned = 0;
   }
-  
+
   if ($mail eq 'nobody@mozilla.org') {
     $assigned = 0;
   }
-    
+
   return $assigned;
 }
 
 sub bugmail_to_kanbanid {
   my $bugmail = shift;
   my $kanbanid;
-  
+
   if (exists $BUGMAIL_TO_KANBANID{$bugmail}) {
     $kanbanid = $BUGMAIL_TO_KANBANID{$bugmail};
   }
   else {
     ( $kanbanid = $bugmail ) =~ s/\@.*//;
   }
-  
+
   return $kanbanid;
 }
 
@@ -907,14 +907,14 @@ sub bugmail_to_kanbanid {
 sub kanbanid_to_bugmail {
   my $kanbanid = shift;
   my $bugmail;
-  
+
   if (exists $KANBANID_TO_BUGMAIL{$kanbanid}) {
     $bugmail = $KANBANID_TO_BUGMAIL{$kanbanid}
   }
   else {
     $bugmail = "$kanbanid\@mozilla.com";
   }
-  
+
   return $bugmail;
 }
 
