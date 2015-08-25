@@ -52,6 +52,8 @@ my $BOARD_ID;
 my $BUGZILLA_TOKEN;
 my $KANBANIZE_INCOMING;
 my $WHITEBOARD_TAG;
+my $BUGZILLA_URL;
+my $KANBANIZE_URL_SUFFIX;
 my @COMPONENTS;
 my @PRODUCTS;
 my %BUGMAIL_TO_KANBANID;
@@ -80,6 +82,15 @@ sub run {
     $KANBANIZE_INCOMING = $config->kanbanize_incoming;
 
     $WHITEBOARD_TAG = $config->tag || die "Missing whiteboard tag";
+
+    $BUGZILLA_URL = $config->bugzilla_url || die "Missing bugzilla url";
+    if ($BUGZILLA_URL !~ m{^https://}) {
+        die "Bugzilla url must start with https://";
+    }
+    $KANBANIZE_URL_SUFFIX = $config->kanbanize_url_suffix || die "Missing kanbanize url suffix";
+    if ($KANBANIZE_URL_SUFFIX =~ m{^https?://}) {
+        die "Kanbanize url suffix must not be a complete URL (for the site 'https://webops.kanbanize.com', this should be 'kanbanize.com'.)";
+    }
 
     @COMPONENTS = @{$config->component};
     @PRODUCTS = @{$config->product};
@@ -117,7 +128,7 @@ use URI;
 use URI::QueryParam;
 
 sub get_bugs {
-    my $uri = URI->new("https://bugzilla.mozilla.org/rest/bug");
+    my $uri = URI->new("${BUGZILLA_URL}/rest/bug");
 
     $uri->query_param(token => $BUGZILLA_TOKEN);
     $uri->query_param(include_fields => qw(id status whiteboard summary assigned_to));
@@ -180,7 +191,7 @@ sub fill_missing_bugs_info {
 
     my $missing_bugs_ids = join ",", sort @missing_bugs;
 
-    my $url = "https://bugzilla.mozilla.org/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&id=$missing_bugs_ids";
+    my $url = "${BUGZILLA_URL}/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&id=$missing_bugs_ids";
 
     my $req =
       HTTP::Request->new( GET => $url );
@@ -209,7 +220,7 @@ sub get_cced_bugs {
 
     my $req =
       HTTP::Request->new( GET =>
-"https://bugzilla.mozilla.org/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&emailcc1=1&emailtype1=exact&email1=$email"
+"${BUGZILLA_URL}/rest/bug?token=$BUGZILLA_TOKEN&include_fields=id,status,whiteboard,summary,assigned_to&bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=REOPENED&emailcc1=1&emailtype1=exact&email1=$email"
       );
 
     my $res = $ua->request($req);
@@ -226,7 +237,7 @@ sub get_cced_bugs {
 }
 
 sub get_marked_bugs {
-    my $uri = URI->new("https://bugzilla.mozilla.org/rest/bug");
+    my $uri = URI->new("${BUGZILLA_URL}/rest/bug");
 
     $uri->query_param(token => $BUGZILLA_TOKEN);
     $uri->query_param(include_fields => qw(id status whiteboard summary assigned_to));
@@ -258,7 +269,7 @@ sub get_bugs_from_all_cards {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/get_all_tasks/boardid/$BOARD_ID/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/get_all_tasks/boardid/$BOARD_ID/format/json"
       );
 
     $req->header( "Content-Length" => "0" );
@@ -279,8 +290,8 @@ sub get_bugs_from_all_cards {
         }
         $all_cards->{ $card->{taskid} } = $card;
 
-        my $extlink = $card->{extlink};    # XXX: Smarter parsing
-        if ( $extlink =~ /(\d+)$/ ) {
+        my $extlink = $card->{extlink};
+        if ( $extlink =~ m{^$BUGZILLA_URL/show_bug\.cgi\?id=(\d+)$} ) {
             my $bugid = $1;
             push @bugs, $bugid;
         }
@@ -370,7 +381,7 @@ sub retrieve_card {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/get_task_details/boardid/$BOARD_ID/taskid/$card_id/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/get_task_details/boardid/$BOARD_ID/taskid/$card_id/format/json"
       );
 
     $req->header( "Content-Length" => "0" );
@@ -487,7 +498,7 @@ sub sync_card {
     }
 
     # Check extlink
-    my $bug_link = "https://bugzilla.mozilla.org/show_bug.cgi?id=$bug->{id}";
+    my $bug_link = "${BUGZILLA_URL}/show_bug.cgi?id=$bug->{id}";
 
     if ( $card->{extlink} ne $bug_link ) {
         update_card_extlink( $card, $bug_link );
@@ -523,7 +534,7 @@ sub complete_card {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/move_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/move_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -559,7 +570,7 @@ sub update_card_extlink {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -585,7 +596,7 @@ sub update_bug_assigned {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     $req->content("assigned_to=$assigned&token=$BUGZILLA_TOKEN");
 
@@ -636,7 +647,7 @@ sub update_card_summary {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -664,7 +675,7 @@ sub update_card_assigned {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json/boardid/$BOARD_ID/taskid/$taskid/assignee/$assignee"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json/boardid/$BOARD_ID/taskid/$taskid/assignee/$assignee"
       );
 
     $req->content("[]");
@@ -687,7 +698,7 @@ sub update_whiteboard {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     # Clear kanban request
     if ( $whiteboard =~ m/\[kanban:$WHITEBOARD_TAG\]/ ) {
@@ -695,20 +706,20 @@ sub update_whiteboard {
     }
 
     # Clear unqualified whiteboard
-    if ( $whiteboard =~ m{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]} ) {
-        $whiteboard =~ s{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]}{};
+    if ( $whiteboard =~ m{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+\]} ) {
+        $whiteboard =~ s{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+\]}{};
     }
 
     # Clear old qualified whiteboards
 
-    if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+} ) {
-            $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+}{};
+    if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+} ) {
+        $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+}{};
     }
 
 
 
     $whiteboard =
-      "[kanban:https://$WHITEBOARD_TAG.kanbanize.com/ctrl_board/$BOARD_ID/$cardid] $whiteboard";
+      "[kanban:https://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/ctrl_board/$BOARD_ID/$cardid] $whiteboard";
 
     $req->content("whiteboard=$whiteboard&token=$BUGZILLA_TOKEN");
 
@@ -730,7 +741,7 @@ sub clear_whiteboard {
 
     my $req =
       HTTP::Request->new(
-        PUT => "https://bugzilla.mozilla.org/rest/bug/$bugid" );
+        PUT => "${BUGZILLA_URL}/rest/bug/$bugid" );
 
     $whiteboard =~ s/\s?\[kanban:[^]]+\]\s?//g;
 
@@ -755,13 +766,13 @@ sub create_card {
 
     my $data = {
         'title'   => api_encode_title("$bug->{id} - $bug->{summary}"),
-        'extlink' => "https://bugzilla.mozilla.org/show_bug.cgi?id=$bug->{id}",
+        'extlink' => "${BUGZILLA_URL}/show_bug.cgi?id=$bug->{id}",
         'boardid' => $BOARD_ID,
     };
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/create_new_task/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/create_new_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -800,7 +811,7 @@ sub move_card {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/move_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/move_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -816,7 +827,7 @@ sub move_card {
 sub get_bug_info {
     my $bugid = shift;
     my $data =
-      get("https://bugzilla.mozilla.org/rest/bug/$bugid?token=$BUGZILLA_TOKEN");
+      get("${BUGZILLA_URL}/rest/bug/$bugid?token=$BUGZILLA_TOKEN");
 
     if ( not $data ) {
         $log->error( "Failed getting Bug info for Bug $bugid from bugzilla" );
@@ -837,7 +848,7 @@ sub parse_whiteboard {
 
     #XXX: Unqualified kanmban tag, need to handle...
     if ( $whiteboard =~
-        m{\[kanban:https://kanbanize.com/ctrl_board/(\d+)/(\d+)\]} )
+        m{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/(\d+)/(\d+)\]} )
     {
         my $boardid = $1;
         my $cardid  = $2;
@@ -850,7 +861,7 @@ sub parse_whiteboard {
         $card = { taskid => $cardid };
     }
     elsif ( $whiteboard =~
-        m{\[kanban:https://$WHITEBOARD_TAG.kanbanize.com/ctrl_board/(\d+)/(\d+)\]} )
+        m{\[kanban:https://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/ctrl_board/(\d+)/(\d+)\]} )
     {
         my $boardid = $1;
         my $cardid  = $2;

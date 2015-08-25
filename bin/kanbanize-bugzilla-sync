@@ -26,8 +26,8 @@ my $config = AppConfig->new(
     "tag=s",
     "mail-map_bugmail=%",
     
-    # "bugzilla_url=s", { DEFAULT => "https://bugzilla.mozilla.org" },
-    # "kanbanize_url=s", { DEFAULT => "http://kanbanize.com" },
+    "bugzilla_url=s", { DEFAULT => "https://bugzilla.mozilla.org" },
+    "kanbanize_url_suffix=s", { DEFAULT => "kanbanize.com" },
 );
 
 $config->file("sync.cfg") if -r "sync.cfg";
