@@ -53,6 +53,7 @@ my $BUGZILLA_TOKEN;
 my $KANBANIZE_INCOMING;
 my $WHITEBOARD_TAG;
 my $BUGZILLA_URL;
+my $KANBANIZE_URL_SUFFIX;
 my @COMPONENTS;
 my @PRODUCTS;
 my %BUGMAIL_TO_KANBANID;
@@ -85,6 +86,10 @@ sub run {
     $BUGZILLA_URL = $config->bugzilla_url || die "Missing bugzilla url";
     if ($BUGZILLA_URL !~ m{^https://}) {
         die "Bugzilla url must start with https://";
+    }
+    $KANBANIZE_URL_SUFFIX = $config->kanbanize_url_suffix || die "Missing kanbanize url suffix";
+    if ($KANBANIZE_URL_SUFFIX =~ m{^https?://}) {
+        die "Kanbanize url suffix must not be a complete URL (for the site 'https://webops.kanbanize.com', this should be 'kanbanize.com'.)";
     }
 
     @COMPONENTS = @{$config->component};
@@ -264,7 +269,7 @@ sub get_bugs_from_all_cards {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/get_all_tasks/boardid/$BOARD_ID/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/get_all_tasks/boardid/$BOARD_ID/format/json"
       );
 
     $req->header( "Content-Length" => "0" );
@@ -376,7 +381,7 @@ sub retrieve_card {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/get_task_details/boardid/$BOARD_ID/taskid/$card_id/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/get_task_details/boardid/$BOARD_ID/taskid/$card_id/format/json"
       );
 
     $req->header( "Content-Length" => "0" );
@@ -529,7 +534,7 @@ sub complete_card {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/move_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/move_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -565,7 +570,7 @@ sub update_card_extlink {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -642,7 +647,7 @@ sub update_card_summary {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -670,7 +675,7 @@ sub update_card_assigned {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/edit_task/format/json/boardid/$BOARD_ID/taskid/$taskid/assignee/$assignee"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/edit_task/format/json/boardid/$BOARD_ID/taskid/$taskid/assignee/$assignee"
       );
 
     $req->content("[]");
@@ -701,20 +706,20 @@ sub update_whiteboard {
     }
 
     # Clear unqualified whiteboard
-    if ( $whiteboard =~ m{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]} ) {
-        $whiteboard =~ s{\[kanban:https://kanbanize.com/ctrl_board/\d+/\d+\]}{};
+    if ( $whiteboard =~ m{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+\]} ) {
+        $whiteboard =~ s{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+\]}{};
     }
 
     # Clear old qualified whiteboards
 
-    if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+} ) {
-            $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://kanbanize.com/ctrl_board/\d+/\d+}{};
+    if ($whiteboard =~ m{kanban:$WHITEBOARD_TAG:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+} ) {
+        $whiteboard =~ s{kanban:$WHITEBOARD_TAG:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/\d+/\d+}{};
     }
 
 
 
     $whiteboard =
-      "[kanban:https://$WHITEBOARD_TAG.kanbanize.com/ctrl_board/$BOARD_ID/$cardid] $whiteboard";
+      "[kanban:https://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/ctrl_board/$BOARD_ID/$cardid] $whiteboard";
 
     $req->content("whiteboard=$whiteboard&token=$BUGZILLA_TOKEN");
 
@@ -767,7 +772,7 @@ sub create_card {
 
     my $req =
       HTTP::Request->new( POST =>
-"http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/create_new_task/format/json"
+"http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/create_new_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -806,7 +811,7 @@ sub move_card {
 
     my $req =
       HTTP::Request->new( POST =>
-          "http://$WHITEBOARD_TAG.kanbanize.com/index.php/api/kanbanize/move_task/format/json"
+          "http://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/index.php/api/kanbanize/move_task/format/json"
       );
 
     $req->content( encode_json($data) );
@@ -843,7 +848,7 @@ sub parse_whiteboard {
 
     #XXX: Unqualified kanmban tag, need to handle...
     if ( $whiteboard =~
-        m{\[kanban:https://kanbanize.com/ctrl_board/(\d+)/(\d+)\]} )
+        m{\[kanban:https://${KANBANIZE_URL_SUFFIX}/ctrl_board/(\d+)/(\d+)\]} )
     {
         my $boardid = $1;
         my $cardid  = $2;
@@ -856,7 +861,7 @@ sub parse_whiteboard {
         $card = { taskid => $cardid };
     }
     elsif ( $whiteboard =~
-        m{\[kanban:https://$WHITEBOARD_TAG.kanbanize.com/ctrl_board/(\d+)/(\d+)\]} )
+        m{\[kanban:https://$WHITEBOARD_TAG.${KANBANIZE_URL_SUFFIX}/ctrl_board/(\d+)/(\d+)\]} )
     {
         my $boardid = $1;
         my $cardid  = $2;
