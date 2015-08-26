@@ -343,6 +343,29 @@ sub sync_bug {
         push @changes, "[card created]";
     }
 
+    # If a reopened bug points to an archived card, create a new card for that bug.
+    if ($card->{columnname} eq 'Archive') {
+        if ($bug->{status} eq 'RESOLVED' or $bug->{status} eq 'VERIFIED')) {
+            # Archived cards can't be updated, but the bug is closed. Take no action.
+            return;
+        } else {
+            # The bug has been reopened since its card was archived. Open a new card.
+
+            my $old_taskid = $card->{taskid};
+
+            $card = create_card($bug);
+
+            if ( not $card ) {
+                $log->warn("Failed to recreate card for bug $bug->{id} w/ archived card $old_taskid");
+                return;
+            }
+
+            update_whiteboard( $bug->{id}, $card->{taskid}, $whiteboard );
+
+            push @changes, "[archived card $old_taskid recreated as $card->{taskid}]";
+        }
+    }
+
     my $new_card = retrieve_card( $card->{taskid}, $bug->{id} );
 
     # Referenced card missing
