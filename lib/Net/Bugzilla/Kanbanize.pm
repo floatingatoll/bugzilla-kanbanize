@@ -305,6 +305,9 @@ sub get_bugs {
     foreach my $bug ( @{ $data->{bugs} } ) {
         $bugs{ $bug->{id} } = $bug;
         $bugs{ $bug->{id} }{source} = "search";
+
+        $bugs{ $bug->{id} }{sources} ||= [];
+        push( @{ $bugs{ $bug->{id} }{sources} }, "search" );
     }
 
     my @marked = get_marked_bugs();
@@ -312,6 +315,9 @@ sub get_bugs {
     foreach my $bug (@marked) {
         $bugs{ $bug->{id} } = $bug;
         $bugs{ $bug->{id} }{source} = "marked";
+
+        $bugs{ $bug->{id} }{sources} ||= [];
+        push( @{ $bugs{ $bug->{id} }{sources} }, "marked" );
     }
 
     my @cced = get_cced_bugs();
@@ -319,6 +325,9 @@ sub get_bugs {
     foreach my $bug (@cced) {
         $bugs{ $bug->{id} } = $bug;
         $bugs{ $bug->{id} }{source} = "cc";
+
+        $bugs{ $bug->{id} }{sources} ||= [];
+        push( @{ $bugs{ $bug->{id} }{sources} }, "cc" );
     }
 
     my @cards = get_bugs_from_all_cards();
@@ -363,6 +372,9 @@ sub fill_missing_bugs_info {
     foreach my $bug ( sort @found_bugs ) {
         $bugs->{ $bug->{id} } = $bug;
         $bugs->{ $bug->{id} }{source} = $source;
+
+        $bugs->{ $bug->{id} }{sources} ||= [];
+        push( @{ $bugs->{ $bug->{id} }{sources} }, $source );
     }
 
     return;
